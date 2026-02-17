@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.title("🏥 Hospital Billing Cleaner Tool")
+st.title("M.E.Nizam Billing Cleaner Tool")
 
 uploaded_file = st.file_uploader(
     "Upload messy hospital billing Excel file",
@@ -125,3 +125,4 @@ if uploaded_file:
         "Cleaned_Billing.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
