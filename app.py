@@ -44,7 +44,7 @@ def clean_file(file):
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
-        # Detect company / insurance label
+        # Detect company / insurance
         if "insurance" in row_text or "hospital" in row_text:
             current_company = " ".join(
                 [str(x) for x in row if pd.notna(x)]
@@ -61,7 +61,6 @@ def clean_file(file):
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
-
                     if (
                         "financial category" not in text.lower()
                         and len(text) <= 15
@@ -69,15 +68,33 @@ def clean_file(file):
                         category_code = text
                         break
 
-            # Extract description from next row
-            if idx + 1 < len(df):
-                next_row = df.iloc[idx + 1]
+            # Extract description safely (skip header rows)
+            for i in range(idx+1, min(idx+4, len(df))):
+                next_row = df.iloc[i]
+
+                next_text = " ".join(
+                    [str(x) for x in next_row if pd.notna(x)]
+                ).lower()
+
+                # Skip table headers
+                if any(x in next_text for x in [
+                    "medical no",
+                    "patients name",
+                    "admission date",
+                    "act.no",
+                    "case no"
+                ]):
+                    continue
+
                 desc_cells = [
                     str(x).strip()
                     for x in next_row
                     if pd.notna(x)
                 ]
-                category_desc = " ".join(desc_cells)
+
+                if desc_cells:
+                    category_desc = " ".join(desc_cells)
+                    break
 
             current_category = category_code
             current_category_desc = category_desc
@@ -88,7 +105,7 @@ def clean_file(file):
         if "sub-total" in row_text:
             continue
 
-        # Detect patient rows
+        # Detect patient data rows
         medical_no = row.iloc[0]
 
         if pd.notna(medical_no) and str(medical_no).isdigit():
@@ -133,7 +150,7 @@ if uploaded_file:
 
     st.dataframe(cleaned_df)
 
-    # Excel download (proper formatting)
+    # Proper Excel download
     buffer = io.BytesIO()
     cleaned_df.to_excel(buffer, index=False, engine="openpyxl")
     buffer.seek(0)
