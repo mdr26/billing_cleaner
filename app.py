@@ -13,7 +13,6 @@ uploaded_file = st.file_uploader(
 FINAL_COLUMNS = [
     "Company",
     "Financial Category",
-    "Category Description",
     "Medical No.",
     "Act No.",
     "Case No.",
@@ -28,6 +27,10 @@ FINAL_COLUMNS = [
 ]
 
 
+def is_patient_row(row):
+    return pd.notna(row.iloc[0]) and str(row.iloc[0]).isdigit()
+
+
 def clean_file(file):
 
     df = pd.read_excel(file, header=None)
@@ -36,7 +39,6 @@ def clean_file(file):
     cleaned_rows = []
     current_company = None
     current_category = None
-    current_category_desc = None
 
     for idx, row in df.iterrows():
 
@@ -44,60 +46,26 @@ def clean_file(file):
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
-        # Detect company / insurance
+        # Detect company / insurance name
         if "insurance" in row_text or "hospital" in row_text:
             current_company = " ".join(
                 [str(x) for x in row if pd.notna(x)]
             )
             continue
 
-        # Detect financial category block
+        # Extract financial category code only
         if "financial category" in row_text or "finanial category" in row_text:
 
-            category_code = None
-            category_desc = None
-
-            # Extract category code from same row
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
+
                     if (
                         "financial category" not in text.lower()
                         and len(text) <= 15
                     ):
-                        category_code = text
+                        current_category = text
                         break
-
-            # Extract description safely (skip header rows)
-            for i in range(idx+1, min(idx+4, len(df))):
-                next_row = df.iloc[i]
-
-                next_text = " ".join(
-                    [str(x) for x in next_row if pd.notna(x)]
-                ).lower()
-
-                # Skip table headers
-                if any(x in next_text for x in [
-                    "medical no",
-                    "patients name",
-                    "admission date",
-                    "act.no",
-                    "case no"
-                ]):
-                    continue
-
-                desc_cells = [
-                    str(x).strip()
-                    for x in next_row
-                    if pd.notna(x)
-                ]
-
-                if desc_cells:
-                    category_desc = " ".join(desc_cells)
-                    break
-
-            current_category = category_code
-            current_category_desc = category_desc
 
             continue
 
@@ -105,17 +73,13 @@ def clean_file(file):
         if "sub-total" in row_text:
             continue
 
-        # Detect patient data rows
-        medical_no = row.iloc[0]
-
-        if pd.notna(medical_no) and str(medical_no).isdigit():
+        # Extract patient rows
+        if is_patient_row(row):
 
             new_row = dict.fromkeys(FINAL_COLUMNS, None)
 
             new_row["Company"] = current_company
             new_row["Financial Category"] = current_category
-            new_row["Category Description"] = current_category_desc
-
             new_row["Medical No."] = row.iloc[0]
             new_row["Act No."] = row.iloc[5]
             new_row["Case No."] = row.iloc[10]
