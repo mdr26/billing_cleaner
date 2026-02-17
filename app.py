@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
 
-
 st.title("🏥 Hospital Billing Cleaner Tool")
 
 uploaded_file = st.file_uploader(
-    "Upload messy billing Excel file",
+    "Upload messy hospital billing Excel file",
     type=["xls", "xlsx"]
 )
 
@@ -36,34 +35,39 @@ def clean_file(file):
     current_company = None
     current_category = None
 
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
 
         row_text = " ".join(
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
+        # Detect company / insurance label
         if "insurance" in row_text or "hospital" in row_text:
-            current_company = row_text.title()
+            current_company = " ".join(
+                [str(x) for x in row if pd.notna(x)]
+            )
             continue
 
-        if "financial category" in row_text:
+        # Detect financial category label
+        if "financial category" in row_text or "finanial category" in row_text:
 
-    # Look ahead for actual category value
-    next_rows = df.iloc[_+1:_+3].values.flatten()
+            next_rows = df.iloc[idx+1:idx+3].values.flatten()
 
-    category_values = [
-        str(x).strip()
-        for x in next_rows
-        if pd.notna(x)
-    ]
+            category_values = [
+                str(x).strip()
+                for x in next_rows
+                if pd.notna(x)
+            ]
 
-    current_category = " ".join(category_values)
+            current_category = " ".join(category_values)
 
-    continue
+            continue
 
+        # Skip subtotal rows
         if "sub-total" in row_text:
             continue
 
+        # Detect patient row
         medical_no = row.iloc[0]
 
         if pd.notna(medical_no) and str(medical_no).isdigit():
@@ -93,7 +97,12 @@ def clean_file(file):
 
             cleaned_rows.append(new_row)
 
-    return pd.DataFrame(cleaned_rows).drop_duplicates()
+    clean_df = pd.DataFrame(cleaned_rows)
+
+    # Remove duplicates
+    clean_df = clean_df.drop_duplicates()
+
+    return clean_df
 
 
 if uploaded_file:
@@ -101,6 +110,7 @@ if uploaded_file:
     cleaned_df = clean_file(uploaded_file)
 
     st.success("✅ File cleaned successfully!")
+
     st.dataframe(cleaned_df)
 
     st.download_button(
@@ -109,4 +119,3 @@ if uploaded_file:
         "Cleaned_Billing.csv",
         mime="text/csv"
     )
-
