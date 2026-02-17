@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import io
 
 st.title("🏥 Hospital Billing Cleaner Tool")
 
@@ -12,6 +13,7 @@ uploaded_file = st.file_uploader(
 FINAL_COLUMNS = [
     "Company",
     "Financial Category",
+    "Category Description",
     "Medical No.",
     "Act No.",
     "Case No.",
@@ -34,6 +36,7 @@ def clean_file(file):
     cleaned_rows = []
     current_company = None
     current_category = None
+    current_category_desc = None
 
     for idx, row in df.iterrows():
 
@@ -48,18 +51,36 @@ def clean_file(file):
             )
             continue
 
-        # Detect financial category label
+        # Detect financial category block
         if "financial category" in row_text or "finanial category" in row_text:
 
-            next_rows = df.iloc[idx+1:idx+3].values.flatten()
+            category_code = None
+            category_desc = None
 
-            category_values = [
-                str(x).strip()
-                for x in next_rows
-                if pd.notna(x)
-            ]
+            # Extract category code from same row
+            for cell in row:
+                if pd.notna(cell):
+                    text = str(cell).strip()
 
-            current_category = " ".join(category_values)
+                    if (
+                        "financial category" not in text.lower()
+                        and len(text) <= 15
+                    ):
+                        category_code = text
+                        break
+
+            # Extract description from next row
+            if idx + 1 < len(df):
+                next_row = df.iloc[idx + 1]
+                desc_cells = [
+                    str(x).strip()
+                    for x in next_row
+                    if pd.notna(x)
+                ]
+                category_desc = " ".join(desc_cells)
+
+            current_category = category_code
+            current_category_desc = category_desc
 
             continue
 
@@ -67,7 +88,7 @@ def clean_file(file):
         if "sub-total" in row_text:
             continue
 
-        # Detect patient row
+        # Detect patient rows
         medical_no = row.iloc[0]
 
         if pd.notna(medical_no) and str(medical_no).isdigit():
@@ -76,6 +97,8 @@ def clean_file(file):
 
             new_row["Company"] = current_company
             new_row["Financial Category"] = current_category
+            new_row["Category Description"] = current_category_desc
+
             new_row["Medical No."] = row.iloc[0]
             new_row["Act No."] = row.iloc[5]
             new_row["Case No."] = row.iloc[10]
@@ -97,10 +120,7 @@ def clean_file(file):
 
             cleaned_rows.append(new_row)
 
-    clean_df = pd.DataFrame(cleaned_rows)
-
-    # Remove duplicates
-    clean_df = clean_df.drop_duplicates()
+    clean_df = pd.DataFrame(cleaned_rows).drop_duplicates()
 
     return clean_df
 
@@ -113,9 +133,14 @@ if uploaded_file:
 
     st.dataframe(cleaned_df)
 
+    # Excel download (proper formatting)
+    buffer = io.BytesIO()
+    cleaned_df.to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+
     st.download_button(
         "📥 Download Cleaned Excel",
-        cleaned_df.to_csv(index=False),
-        "Cleaned_Billing.csv",
-        mime="text/csv"
+        buffer,
+        "Cleaned_Billing.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
