@@ -47,10 +47,19 @@ def clean_file(file):
             continue
 
         if "financial category" in row_text:
-            current_category = " ".join(
-                [str(x) for x in row if pd.notna(x)]
-            )
-            continue
+
+    # Look ahead for actual category value
+    next_rows = df.iloc[_+1:_+3].values.flatten()
+
+    category_values = [
+        str(x).strip()
+        for x in next_rows
+        if pd.notna(x)
+    ]
+
+    current_category = " ".join(category_values)
+
+    continue
 
         if "sub-total" in row_text:
             continue
@@ -100,3 +109,4 @@ if uploaded_file:
         "Cleaned_Billing.csv",
         mime="text/csv"
     )
+
