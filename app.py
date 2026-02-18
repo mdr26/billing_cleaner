@@ -19,6 +19,7 @@ FINAL_COLUMNS = [
     "Patients Name",
     "Admission Date",
     "Discharge Date",
+    "Length of Stay",
     "Total Price",
     "Total",
     "Comp. Part",
@@ -46,20 +47,30 @@ def clean_file(file):
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
-        # UPDATED COMPANY LOGIC (your idea)
+        # Skip subtotal rows immediately
+        if "sub-total" in row_text:
+            continue
+
+        # Financial Category block
         if "financial category" in row_text or "finanial category" in row_text:
 
-            # Company from row above
-            if idx > 0:
-                prev_row = df.iloc[idx - 1]
+            # Look above for company safely
+            for j in range(idx-1, max(idx-4, -1), -1):
+
+                prev_row = df.iloc[j]
                 prev_text = " ".join(
                     [str(x) for x in prev_row if pd.notna(x)]
                 ).strip()
 
-                if prev_text:
+                if (
+                    prev_text
+                    and "sub-total" not in prev_text.lower()
+                    and not is_patient_row(prev_row)
+                ):
                     current_company = prev_text
+                    break
 
-            # Extract financial category code
+            # Extract category code
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
@@ -73,12 +84,20 @@ def clean_file(file):
 
             continue
 
-        # Skip subtotal rows
-        if "sub-total" in row_text:
-            continue
-
-        # Patient data rows
+        # Patient rows
         if is_patient_row(row):
+
+            admission = pd.to_datetime(
+                row.iloc[25], errors="coerce", dayfirst=True
+            )
+
+            discharge = pd.to_datetime(
+                row.iloc[33], errors="coerce", dayfirst=True
+            )
+
+            los = None
+            if pd.notna(admission) and pd.notna(discharge):
+                los = (discharge - admission).days
 
             new_row = dict.fromkeys(FINAL_COLUMNS, None)
 
@@ -88,15 +107,9 @@ def clean_file(file):
             new_row["Act No."] = row.iloc[5]
             new_row["Case No."] = row.iloc[10]
             new_row["Patients Name"] = row.iloc[14]
-
-            new_row["Admission Date"] = pd.to_datetime(
-                row.iloc[25], errors="coerce", dayfirst=True
-            )
-
-            new_row["Discharge Date"] = pd.to_datetime(
-                row.iloc[33], errors="coerce", dayfirst=True
-            )
-
+            new_row["Admission Date"] = admission
+            new_row["Discharge Date"] = discharge
+            new_row["Length of Stay"] = los
             new_row["Total Price"] = row.iloc[36]
             new_row["Total"] = row.iloc[37]
             new_row["Comp. Part"] = row.iloc[39]
@@ -105,9 +118,7 @@ def clean_file(file):
 
             cleaned_rows.append(new_row)
 
-    clean_df = pd.DataFrame(cleaned_rows).drop_duplicates()
-
-    return clean_df
+    return pd.DataFrame(cleaned_rows).drop_duplicates()
 
 
 if uploaded_file:
