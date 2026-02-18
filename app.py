@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.title("M.E.Nizam Billing Cleaner Tool")
+st.title("🏥 Hospital Billing Cleaner Tool")
 
 uploaded_file = st.file_uploader(
     "Upload messy hospital billing Excel file",
@@ -46,16 +46,20 @@ def clean_file(file):
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
-        # Detect company / insurance name
-        if "insurance" in row_text or "hospital" in row_text:
-            current_company = " ".join(
-                [str(x) for x in row if pd.notna(x)]
-            )
-            continue
-
-        # Extract financial category code only
+        # UPDATED COMPANY LOGIC (your idea)
         if "financial category" in row_text or "finanial category" in row_text:
 
+            # Company from row above
+            if idx > 0:
+                prev_row = df.iloc[idx - 1]
+                prev_text = " ".join(
+                    [str(x) for x in prev_row if pd.notna(x)]
+                ).strip()
+
+                if prev_text:
+                    current_company = prev_text
+
+            # Extract financial category code
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
@@ -73,7 +77,7 @@ def clean_file(file):
         if "sub-total" in row_text:
             continue
 
-        # Extract patient rows
+        # Patient data rows
         if is_patient_row(row):
 
             new_row = dict.fromkeys(FINAL_COLUMNS, None)
@@ -114,7 +118,6 @@ if uploaded_file:
 
     st.dataframe(cleaned_df)
 
-    # Proper Excel download
     buffer = io.BytesIO()
     cleaned_df.to_excel(buffer, index=False, engine="openpyxl")
     buffer.seek(0)
@@ -125,4 +128,3 @@ if uploaded_file:
         "Cleaned_Billing.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
