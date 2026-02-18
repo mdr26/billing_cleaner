@@ -51,30 +51,38 @@ def clean_file(file):
         if "sub-total" in row_text:
             continue
 
-        # Financial Category block
+        # Detect financial category block
         if "financial category" in row_text or "finanial category" in row_text:
 
-            # Look above for company safely
-            for j in range(idx-1, max(idx-4, -1), -1):
+            # Find company safely above category
+            for j in range(idx-1, max(idx-6, -1), -1):
 
                 prev_row = df.iloc[j]
                 prev_text = " ".join(
                     [str(x) for x in prev_row if pd.notna(x)]
                 ).strip()
 
+                lower_text = prev_text.lower()
+
                 if (
                     prev_text
-                    and "sub-total" not in prev_text.lower()
+                    and "sub-total" not in lower_text
                     and not is_patient_row(prev_row)
+                    and not any(x in lower_text for x in [
+                        "medical no",
+                        "act.no",
+                        "patients name",
+                        "admission date",
+                        "case no"
+                    ])
                 ):
                     current_company = prev_text
                     break
 
-            # Extract category code
+            # Extract financial category code
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
-
                     if (
                         "financial category" not in text.lower()
                         and len(text) <= 15
@@ -118,7 +126,9 @@ def clean_file(file):
 
             cleaned_rows.append(new_row)
 
-    return pd.DataFrame(cleaned_rows).drop_duplicates()
+    clean_df = pd.DataFrame(cleaned_rows).drop_duplicates()
+
+    return clean_df
 
 
 if uploaded_file:
