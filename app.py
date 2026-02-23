@@ -9,7 +9,6 @@ uploaded_file = st.file_uploader(
     type=["xls", "xlsx"]
 )
 
-
 FINAL_COLUMNS = [
     "Company",
     "Financial Category",
@@ -28,8 +27,12 @@ FINAL_COLUMNS = [
 ]
 
 
+def safe_get(row, index):
+    return row.iloc[index] if len(row) > index else None
+
+
 def is_patient_row(row):
-    return pd.notna(row.iloc[0]) and str(row.iloc[0]).isdigit()
+    return pd.notna(safe_get(row, 0)) and str(safe_get(row, 0)).isdigit()
 
 
 def clean_file(file):
@@ -47,25 +50,33 @@ def clean_file(file):
             [str(x) for x in row if pd.notna(x)]
         ).lower()
 
-        # Skip subtotal rows immediately
         if "sub-total" in row_text:
             continue
 
-        # Financial Category block
+        # Financial Category Block
         if "financial category" in row_text or "finanial category" in row_text:
 
-            # Look above for company safely
-            for j in range(idx-1, max(idx-4, -1), -1):
+            # Find company safely above
+            for j in range(idx-1, max(idx-6, -1), -1):
 
                 prev_row = df.iloc[j]
                 prev_text = " ".join(
                     [str(x) for x in prev_row if pd.notna(x)]
                 ).strip()
 
+                lower_text = prev_text.lower()
+
                 if (
                     prev_text
-                    and "sub-total" not in prev_text.lower()
+                    and "sub-total" not in lower_text
                     and not is_patient_row(prev_row)
+                    and not any(x in lower_text for x in [
+                        "medical no",
+                        "act.no",
+                        "patients name",
+                        "admission date",
+                        "case no"
+                    ])
                 ):
                     current_company = prev_text
                     break
@@ -74,7 +85,6 @@ def clean_file(file):
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
-
                     if (
                         "financial category" not in text.lower()
                         and len(text) <= 15
@@ -88,11 +98,11 @@ def clean_file(file):
         if is_patient_row(row):
 
             admission = pd.to_datetime(
-                row.iloc[25], errors="coerce", dayfirst=True
+                safe_get(row, 25), errors="coerce", dayfirst=True
             )
 
             discharge = pd.to_datetime(
-                row.iloc[33], errors="coerce", dayfirst=True
+                safe_get(row, 33), errors="coerce", dayfirst=True
             )
 
             los = None
@@ -103,18 +113,18 @@ def clean_file(file):
 
             new_row["Company"] = current_company
             new_row["Financial Category"] = current_category
-            new_row["Medical No."] = row.iloc[0]
-            new_row["Act No."] = row.iloc[5]
-            new_row["Case No."] = row.iloc[10]
-            new_row["Patients Name"] = row.iloc[14]
+            new_row["Medical No."] = safe_get(row, 0)
+            new_row["Act No."] = safe_get(row, 5)
+            new_row["Case No."] = safe_get(row, 10)
+            new_row["Patients Name"] = safe_get(row, 14)
             new_row["Admission Date"] = admission
             new_row["Discharge Date"] = discharge
             new_row["Length of Stay"] = los
-            new_row["Total Price"] = row.iloc[36]
-            new_row["Total"] = row.iloc[37]
-            new_row["Comp. Part"] = row.iloc[39]
-            new_row["Patient"] = row.iloc[41]
-            new_row["Type"] = row.iloc[42]
+            new_row["Total Price"] = safe_get(row, 36)
+            new_row["Total"] = safe_get(row, 37)
+            new_row["Comp. Part"] = safe_get(row, 39)
+            new_row["Patient"] = safe_get(row, 41)
+            new_row["Type"] = safe_get(row, 42)
 
             cleaned_rows.append(new_row)
 
