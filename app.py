@@ -67,17 +67,18 @@ def clean_file(file):
                 lower_text = prev_text.lower()
 
                 if (
-                    prev_text
-                    and "sub-total" not in lower_text
-                    and not is_patient_row(prev_row)
-                    and not any(x in lower_text for x in [
-                        "medical no",
-                        "act.no",
-                        "patients name",
-                        "admission date",
-                        "case no"
-                    ])
-                ):
+    prev_text
+    and "sub-total" not in lower_text
+    and "financial category" not in lower_text
+    and not is_patient_row(prev_row)
+    and not any(x in lower_text for x in [
+        "medical no",
+        "act.no",
+        "patients name",
+        "admission date",
+        "case no"
+    ])
+):
                     current_company = prev_text
                     break
 
@@ -149,3 +150,4 @@ if uploaded_file:
         "Cleaned_Billing.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
