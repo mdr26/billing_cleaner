@@ -26,14 +26,12 @@ FINAL_COLUMNS = [
     "Type"
 ]
 
-
 def safe_get(row, index):
     return row.iloc[index] if len(row) > index else None
 
-
 def is_patient_row(row):
-    return pd.notna(safe_get(row, 0)) and str(safe_get(row, 0)).isdigit()
-
+    val = safe_get(row, 0)
+    return pd.notna(val) and str(val).isdigit()
 
 def clean_file(file):
 
@@ -48,39 +46,16 @@ def clean_file(file):
 
         row_text = " ".join(
             [str(x) for x in row if pd.notna(x)]
-        ).lower()
+        ).strip()
 
-        if "sub-total" in row_text:
+        lower_text = row_text.lower()
+
+        # Skip subtotal rows
+        if "sub-total" in lower_text:
             continue
 
         # Financial Category Block
-        if "financial category" in row_text or "finanial category" in row_text:
-
-            # Find company safely above
-            for j in range(idx-1, max(idx-6, -1), -1):
-
-                prev_row = df.iloc[j]
-                prev_text = " ".join(
-                    [str(x) for x in prev_row if pd.notna(x)]
-                ).strip()
-
-                lower_text = prev_text.lower()
-
-                if (
-    prev_text
-    and "sub-total" not in lower_text
-    and "financial category" not in lower_text
-    and not is_patient_row(prev_row)
-    and not any(x in lower_text for x in [
-        "medical no",
-        "act.no",
-        "patients name",
-        "admission date",
-        "case no"
-    ])
-):
-                    current_company = prev_text
-                    break
+        if "financial category" in lower_text or "finanial category" in lower_text:
 
             # Extract category code
             for cell in row:
@@ -92,6 +67,12 @@ def clean_file(file):
                     ):
                         current_category = text
                         break
+
+            # Extract company from same row
+            # Company text usually appears before "Financial Category"
+            split_text = row_text.split("Financial Category")[0].strip()
+            if split_text:
+                current_company = split_text
 
             continue
 
@@ -131,7 +112,6 @@ def clean_file(file):
 
     return pd.DataFrame(cleaned_rows).drop_duplicates()
 
-
 if uploaded_file:
 
     cleaned_df = clean_file(uploaded_file)
@@ -150,4 +130,3 @@ if uploaded_file:
         "Cleaned_Billing.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
