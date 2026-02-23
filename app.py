@@ -46,18 +46,39 @@ def clean_file(file):
 
         row_text = " ".join(
             [str(x) for x in row if pd.notna(x)]
-        ).strip()
+        ).lower()
 
-        lower_text = row_text.lower()
-
-        # Skip subtotal rows
-        if "sub-total" in lower_text:
+        if "sub-total" in row_text:
             continue
 
-        # Financial Category Block
-        if "financial category" in lower_text or "finanial category" in lower_text:
+        # Financial category block
+        if "financial category" in row_text or "finanial category" in row_text:
 
-            # Extract category code
+            # Extract company from row above
+            if idx > 0:
+                prev_row = df.iloc[idx-1]
+                prev_text = " ".join(
+                    [str(x) for x in prev_row if pd.notna(x)]
+                ).strip()
+
+                lower_prev = prev_text.lower()
+
+                # If looks invalid → flag it
+                if (
+                    "sub-total" in lower_prev
+                    or "financial category" in lower_prev
+                    or any(x in lower_prev for x in [
+                        "medical no",
+                        "patients name",
+                        "act.no",
+                        "case no"
+                    ])
+                ):
+                    current_company = "CHECK COMPANY"
+                else:
+                    current_company = prev_text
+
+            # Extract financial category code
             for cell in row:
                 if pd.notna(cell):
                     text = str(cell).strip()
@@ -67,12 +88,6 @@ def clean_file(file):
                     ):
                         current_category = text
                         break
-
-            # Extract company from same row
-            # Company text usually appears before "Financial Category"
-            split_text = row_text.split("Financial Category")[0].strip()
-            if split_text:
-                current_company = split_text
 
             continue
 
